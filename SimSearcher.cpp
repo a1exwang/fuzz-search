@@ -23,19 +23,19 @@ int SimSearcher::createIndex(const char *filename, unsigned q) {
   this->q = q;
   struct stat statbuf;
   if (stat(filename, &statbuf) == -1) {
-    exit(1);
+    return FAILURE;
   }
   this->filesize = (uint32_t) statbuf.st_size;
 
   this->fd = open(filename, 0);
   if (this->fd < 0) {
-    cerr << "Cannot open this file" << endl;
+//    cerr << "Cannot open this file" << endl;
     return FAILURE;
   }
 
   this->mem = nullptr;
   if (nullptr == (this->mem = (char*)mmap(nullptr, this->filesize, PROT_READ, MAP_PRIVATE, this->fd, 0))) {
-    cerr << "Cannot map this file" << endl;
+//    cerr << "Cannot map this file" << endl;
     return FAILURE;
   }
 
@@ -114,10 +114,11 @@ int SimSearcher::searchED(const char *_query, unsigned threshold, vector<pair<un
     }
   }
 
-  int t = (int)(this->max_len > query.size() ? this->max_len : query.size()) -
-      this->q + 1 - (int)threshold * this->q;
+//  int t = (int)(this->max_len > query.size() ? this->max_len : query.size()) -
+//      this->q + 1 - (int)threshold * this->q;
+  int t = (int)query.size() - this->q + 1 - (int)threshold * this->q;
   for (uint32_t i = 0; i < this->data_count; ++i) {
-    if ((int)results[i] >= t) {
+    if ((int)results[i] >= t && this->data[i].len > 0) {
       auto dist = SimSearcher::editDist(
           this->data[i].s,
           query.c_str(),
@@ -130,6 +131,7 @@ int SimSearcher::searchED(const char *_query, unsigned threshold, vector<pair<un
       }
     }
   }
+  delete []results;
 
   return SUCCESS;
 }
@@ -168,7 +170,7 @@ int SimSearcher::searchJaccard(const char *_query, double threshold, vector<pair
   double t = t1 > t2 ? t1 : t2;
 
   for (uint32_t i = 0; i < this->data_count; ++i) {
-    if (results[i] >= t) {
+    if (results[i] >= t && this->data[i].len > 0) {
       auto jac = SimSearcher::jaccard(
           this->data[i].s,
           this->data[i].len,
@@ -180,5 +182,6 @@ int SimSearcher::searchJaccard(const char *_query, double threshold, vector<pair
     }
   }
 
+  delete []results;
   return SUCCESS;
 }
