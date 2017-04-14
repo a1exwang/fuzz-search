@@ -30,13 +30,13 @@ int SimSearcher::createIndex(const char *filename, unsigned q) {
   this->fd = open(filename, 0);
   if (this->fd < 0) {
     cerr << "Cannot open this file" << endl;
-    exit(2);
+    return FAILURE;
   }
 
   this->mem = nullptr;
   if (nullptr == (this->mem = (char*)mmap(nullptr, this->filesize, PROT_READ, MAP_PRIVATE, this->fd, 0))) {
     cerr << "Cannot map this file" << endl;
-    exit(2);
+    return FAILURE;
   }
 
   uint32_t last_i = 0;
@@ -62,9 +62,9 @@ void SimSearcher::createEDIndex() {
       this->max_len = this->data[i].len;
     }
 
-    if (this->data[i].len + 1 < this->q)
+    if ((int)this->data[i].len + 1 < this->q)
       continue;
-    for (int j = 0; j < this->data[i].len - this->q + 1; ++j) {
+    for (int j = 0; j < (int)this->data[i].len - this->q + 1; ++j) {
       string gram(&this->data[i].s[j], (uint32_t) this->q);
       if (this->ed_index.find(gram) == this->ed_index.end()) {
         this->ed_index[gram] = vector<uint32_t>();
@@ -81,8 +81,8 @@ void SimSearcher::createJaccardIndex() {
       this->min_len = this->data[i].len;
     }
     int last_j = 0;
-    for (int j = 0; j < this->data[i].len + 1; ++j) {
-      if (this->data[i].s[j] == ' ' || j == this->data[i].len) {
+    for (int j = 0; j < (int)this->data[i].len + 1; ++j) {
+      if (this->data[i].s[j] == ' ' || j == (int)this->data[i].len) {
         string word(&this->data[i].s[last_j], (uint32_t)(j - last_j));
 
         // insert word to inverted list
@@ -104,7 +104,7 @@ int SimSearcher::searchED(const char *_query, unsigned threshold, vector<pair<un
   uint32_t *results = new uint32_t[this->data_count];
   memset(results, 0, sizeof(uint32_t) * this->data_count);
 
-  for (int i = 0; i < query.size() - this->q + 1; ++i) {
+  for (int i = 0; i < (int)query.size() - this->q + 1; ++i) {
     string subs(query.begin() + i, query.begin() + i + this->q);
     if (this->ed_index.find(subs) != this->ed_index.end()) {
       auto inverted_list = this->ed_index[subs];
@@ -114,10 +114,10 @@ int SimSearcher::searchED(const char *_query, unsigned threshold, vector<pair<un
     }
   }
 
-  uint32_t t = (uint32_t)(this->max_len > query.size() ? this->max_len : query.size())
-               - this->q + 1 - threshold * this->q;
+  int t = (int)(this->max_len > query.size() ? this->max_len : query.size()) -
+      this->q + 1 - (int)threshold * this->q;
   for (uint32_t i = 0; i < this->data_count; ++i) {
-    if (results[i] >= t) {
+    if ((int)results[i] >= t) {
       auto dist = SimSearcher::editDist(
           this->data[i].s,
           query.c_str(),
@@ -125,7 +125,7 @@ int SimSearcher::searchED(const char *_query, unsigned threshold, vector<pair<un
           (uint32_t)query.size(),
           threshold
       );
-      if (dist <= threshold) {
+      if (dist <= (int)threshold) {
         final_result.push_back(pair<uint32_t, uint32_t>(i, dist));
       }
     }
@@ -142,8 +142,8 @@ int SimSearcher::searchJaccard(const char *_query, double threshold, vector<pair
   // calculate grams of query string
   vector<string> words;
   int last_j = 0;
-  for (int j = 0; j < query.size() + 1; ++j) {
-    if (query[j] == ' ' || j == query.size()) {
+  for (int j = 0; j < (int)query.size() + 1; ++j) {
+    if (query[j] == ' ' || j == (int)query.size()) {
       string word(query.begin() + last_j, query.begin() + j);
       words.push_back(word);
       last_j = j + 1;
