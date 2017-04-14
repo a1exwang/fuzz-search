@@ -31,6 +31,38 @@ class SimSearcher {
 										editDist(str1,  str2, m-1, n-1, tau)
 		);
 	}
+
+  // s2 is sorted list
+	static inline double jaccard(const char *s1, uint32_t len, const std::vector<std::string> &s2) {
+		std::map<std::string, int> s1_words;
+		int last_j = 0;
+		for (int j = 0; j < len + 1; ++j) {
+			if (s1[j] == ' ' || len == j) {
+				std::string word(s1 + last_j, (uint32_t)(j - last_j));
+				s1_words[word] = 1;
+				last_j = j + 1;
+			}
+		}
+
+		auto it1 = s1_words.begin();
+		auto it2 = s2.begin();
+		int same_count = 0;
+		while (it1 != s1_words.end() && it2 != s2.end()) {
+      if (it1->first == *it2) {
+				same_count++;
+				it1++;
+				it2++;
+			}
+			else if (it1->first < *it2) {
+				it1++;
+			}
+			else {
+				it2++;
+			}
+		}
+
+		return ((double)same_count) / (s1_words.size() + s2.size() - same_count);
+	}
 public:
 	SimSearcher();
 	~SimSearcher();
@@ -59,8 +91,11 @@ private:
 
   uint32_t data_count;
   str *data;
-	uint32_t max_len;
 
 	std::map<std::string, std::vector<uint32_t>> ed_index;
+	uint32_t max_len;
+
+  std::map<std::string, std::vector<uint32_t>> jaccard_index;
+  uint32_t min_len;
 };
 

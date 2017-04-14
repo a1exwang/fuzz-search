@@ -56,23 +56,43 @@ int SimSearcher::createIndex(const char *filename, unsigned q) {
 	return SUCCESS;
 }
 
-int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<unsigned, double>> &result) {
-	result.clear();
-	return SUCCESS;
-}
-
 void SimSearcher::createEDIndex() {
   for (uint32_t i = 0; i < this->data_count; ++i) {
     if (this->data[i].len > this->max_len) {
       this->max_len = this->data[i].len;
     }
 
+    if (this->data[i].len + 1 < this->q)
+      continue;
     for (int j = 0; j < this->data[i].len - this->q + 1; ++j) {
       string gram(&this->data[i].s[j], (uint32_t) this->q);
       if (this->ed_index.find(gram) == this->ed_index.end()) {
         this->ed_index[gram] = vector<uint32_t>();
       }
       this->ed_index[gram].push_back(i);
+    }
+  }
+}
+
+void SimSearcher::createJaccardIndex() {
+  this->min_len = 0;
+  for (uint32_t i = 0; i < this->data_count; ++i) {
+    if (this->data[i].len < this->min_len) {
+      this->min_len = this->data[i].len;
+    }
+    int last_j = 0;
+    for (int j = 0; j < this->data[i].len + 1; ++j) {
+      if (this->data[i].s[j] == ' ' || j == this->data[i].len) {
+        string word(&this->data[i].s[last_j], (uint32_t)(j - last_j));
+
+        // insert word to inverted list
+        if (this->jaccard_index.find(word) == this->jaccard_index.end()) {
+          this->jaccard_index[word] = vector<uint32_t>();
+        }
+        this->jaccard_index[word].push_back(i);
+
+        last_j = j + 1;
+      }
     }
   }
 }
@@ -114,8 +134,51 @@ int SimSearcher::searchED(const char *_query, unsigned threshold, vector<pair<un
   return SUCCESS;
 }
 
-void SimSearcher::createJaccardIndex() {
 
+int SimSearcher::searchJaccard(const char *_query, double threshold, vector<pair<unsigned, double>> &final_result) {
+  final_result.clear();
+  string query(_query);
+
+  // calculate grams of query string
+  vector<string> words;
+  int last_j = 0;
+  for (int j = 0; j < query.size() + 1; ++j) {
+    if (query[j] == ' ' || j == query.size()) {
+      string word(query.begin() + last_j, query.begin() + j);
+      words.push_back(word);
+      last_j = j + 1;
+    }
+  }
+
+  // calculate
+  uint32_t *results = new uint32_t[this->data_count];
+  memset(results, 0, sizeof(uint32_t) * this->data_count);
+
+  for (auto word : words) {
+    if (this->jaccard_index.find(word) != this->jaccard_index.end()) {
+      auto inverted_list = this->jaccard_index[word];
+      for (auto index : inverted_list) {
+        results[index]++;
+      }
+    }
+  }
+
+  double t1 = threshold * words.size();
+  double t2 = (this->min_len + words.size()) * threshold / (1 + threshold);
+  double t = t1 > t2 ? t1 : t2;
+
+  for (uint32_t i = 0; i < this->data_count; ++i) {
+    if (results[i] >= t) {
+      auto jac = SimSearcher::jaccard(
+          this->data[i].s,
+          this->data[i].len,
+          words
+      );
+      if (jac >= threshold) {
+        final_result.push_back(pair<uint32_t, uint32_t>(i, jac));
+      }
+    }
+  }
+
+  return SUCCESS;
 }
-
-
